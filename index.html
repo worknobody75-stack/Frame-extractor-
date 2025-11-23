@@ -3,500 +3,489 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pro Frame Extractor</title>
+    <title>Frame Extractor: Select & Extract</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Inter', sans-serif; }
-        .drop-zone {
-            border: 2px dashed #cbd5e1;
-            transition: all 0.3s ease;
-        }
-        .drop-zone.active {
-            border-color: #3b82f6;
-            background-color: #eff6ff;
-        }
         
-        /* Grid Lines */
-        .grid-line {
+        /* Selection Box */
+        .selection-box {
             position: absolute;
-            background-color: rgba(239, 68, 68, 0.8);
-            z-index: 10;
-            transition: background-color 0.2s;
-        }
-        .grid-line:hover {
-            background-color: #ef4444;
-            box-shadow: 0 0 4px rgba(239, 68, 68, 0.8);
-        }
-        .grid-line.horizontal {
-            left: 0; right: 0; height: 1px;
-            cursor: row-resize;
-            /* Invisible touch area */
-            border-top: 5px solid transparent;
-            border-bottom: 5px solid transparent;
-            background-clip: padding-box; 
-        }
-        .grid-line.vertical {
-            top: 0; bottom: 0; width: 1px;
-            cursor: col-resize;
-            /* Invisible touch area */
-            border-left: 5px solid transparent;
-            border-right: 5px solid transparent;
-            background-clip: padding-box;
-        }
-        
-        .grid-handle {
-            position: absolute;
-            width: 16px; 
-            height: 16px;
-            background: #fff;
-            border: 2px solid #ef4444;
-            border-radius: 50%;
+            background-color: rgba(59, 130, 246, 0.2); /* Blue tint */
+            border: 2px solid #3b82f6; /* Blue border */
             z-index: 20;
-            transform: translate(-50%, -50%);
-            display: none; /* Only show on hover/active if needed, keeps UI clean */
+            cursor: move;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: background-color 0.1s, border-color 0.1s;
+        }
+        .selection-box:hover {
+            background-color: rgba(59, 130, 246, 0.3);
+            border-color: #2563eb;
+            z-index: 25;
         }
 
-        /* Loading Spinner */
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-radius: 50%;
-            border-top: 3px solid #3b82f6;
-            width: 24px;
-            height: 24px;
-            -webkit-animation: spin 1s linear infinite; /* Safari */
-            animation: spin 1s linear infinite;
+        /* Active drawing box */
+        .selection-box.drawing {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-style: dashed;
+            pointer-events: none;
         }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+
+        /* Delete Handle */
+        .box-delete {
+            position: absolute;
+            top: -10px; right: -10px;
+            width: 20px; height: 20px;
+            background: #ef4444;
+            color: white;
+            border-radius: 50%;
+            font-size: 12px;
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 30;
+            border: 2px solid white;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+        }
+        .selection-box:hover .box-delete { display: flex; }
+        .box-delete:hover { background-color: #dc2626; transform: scale(1.1); }
+        
+        /* Placeholder Hover Effect */
+        #placeholderText:hover {
+            background-color: #f8fafc;
+            border-color: #3b82f6;
+            color: #3b82f6;
         }
     </style>
 </head>
-<body class="bg-slate-50 min-h-screen text-slate-800 p-4 md:p-8">
+<body class="bg-slate-50 min-h-screen text-slate-800 p-4 md:p-6">
 
-    <div class="max-w-7xl mx-auto">
+    <div class="max-w-[1400px] mx-auto h-[calc(100vh-48px)] flex flex-col">
+        
         <!-- Header -->
-        <div class="mb-6 flex flex-col md:flex-row justify-between items-end gap-4 border-b border-slate-200 pb-6">
-            <div>
-                <h1 class="text-3xl font-bold text-slate-900">Pro Frame Extractor</h1>
-                <p class="text-slate-600 mt-1">Drag the red lines to slice your image perfectly.</p>
-            </div>
-            <div id="topControls" class="hidden flex gap-3">
-                 <button id="resetGridBtn" class="text-slate-600 hover:text-slate-900 text-sm font-medium px-3 py-2">
-                    Reset Grid
-                </button>
-                <button id="downloadAllBtn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shadow-sm transition-colors flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                    Download All Frames
-                </button>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div class="flex justify-between items-center mb-4 bg-white p-3 rounded-lg shadow-sm border border-slate-200 shrink-0">
+            <h1 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                Frame Extractor <span class="text-slate-400 font-normal text-sm ml-1">Select Mode</span>
+            </h1>
             
-            <!-- Left Column: Editor -->
-            <div class="lg:col-span-5 space-y-4">
+            <!-- Hidden File Input -->
+            <input type="file" id="fileInput" class="hidden" accept="image/*">
+
+            <div id="headerControls" class="hidden">
+                 <button id="resetImageBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    New Image
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-0">
+            
+            <!-- Left Panel: Controls & Editor -->
+            <div class="lg:col-span-7 flex flex-col gap-4 min-h-0">
                 
-                <!-- Upload State -->
-                <div id="uploadArea" class="bg-white rounded-xl shadow-sm p-6">
-                    <div id="dropZone" class="drop-zone rounded-lg p-12 text-center cursor-pointer relative h-64 flex flex-col items-center justify-center">
-                        <input type="file" id="fileInput" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept="image/*">
-                        <div class="pointer-events-none">
-                            <svg class="w-12 h-12 text-slate-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                            </svg>
-                            <p class="text-lg font-medium text-slate-700">Drop image here</p>
-                            <p class="text-sm text-slate-400 mt-1">Supports JPG, PNG</p>
+                <!-- Info Bar -->
+                <div id="controlsPanel" class="bg-white p-3 rounded-xl shadow-sm border border-slate-200 hidden flex justify-between items-center">
+                    <div class="text-sm text-slate-600 flex items-center gap-2">
+                         <span class="flex items-center justify-center w-6 h-6 rounded-full bg-blue-100 text-blue-600 font-bold text-xs">1</span>
+                         <span>Drag to select areas. Draw multiple boxes to extract multiple items.</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button id="clearAllBtn" class="text-xs text-red-600 hover:bg-red-50 px-3 py-1.5 rounded font-medium border border-red-200">Clear Selection</button>
+                    </div>
+                </div>
+
+                <!-- Canvas -->
+                <div class="flex-1 bg-slate-100 rounded-xl border border-slate-200 relative overflow-hidden flex items-center justify-center group select-none">
+                    
+                    <!-- New Placeholder: Clickable Drop Zone -->
+                    <div id="placeholderText" class="text-slate-400 text-center p-12 cursor-pointer border-2 border-dashed border-transparent hover:border-blue-400 transition-all rounded-xl w-full h-full flex flex-col items-center justify-center">
+                        <svg class="w-16 h-16 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                        <p class="text-xl font-bold mb-2">Click to Upload Image</p>
+                        <p class="text-sm opacity-75">or drag and drop here</p>
+                    </div>
+                    
+                    <div id="previewWrapper" class="relative hidden">
+                        <!-- Image Container -->
+                        <div id="imageContainer" class="relative shadow-xl bg-white cursor-crosshair">
+                            <img id="sourceImg" class="block w-full h-full pointer-events-none select-none">
+                            
+                            <!-- Selection Layer -->
+                            <div id="selectionLayer" class="absolute inset-0 z-20"></div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Editor State (Hidden initially) -->
-                <div id="editorArea" class="hidden bg-white rounded-xl shadow-sm p-4 border border-slate-200">
-                    
-                    <!-- Toolbar -->
-                    <div class="flex items-center gap-4 mb-3 pb-3 border-b border-slate-100 text-sm">
-                        <div class="flex items-center gap-2">
-                            <label class="font-medium text-slate-600">Rows:</label>
-                            <input type="number" id="rowsInput" value="6" min="1" max="20" class="w-14 p-1 border rounded text-center">
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <label class="font-medium text-slate-600">Cols:</label>
-                            <input type="number" id="colsInput" value="6" min="1" max="20" class="w-14 p-1 border rounded text-center">
-                        </div>
-                        <button id="applyGridBtn" class="bg-slate-800 text-white px-3 py-1 rounded hover:bg-slate-700 text-xs">Re-Grid</button>
-                        <span class="ml-auto text-xs text-slate-400 italic">Drag red lines to adjust</span>
-                    </div>
-
-                    <!-- Interactive Preview -->
-                    <div class="relative w-full bg-slate-100 rounded border border-slate-300 select-none overflow-hidden touch-none" id="previewWrapper" style="height: 400px;">
-                        <div id="imageContainer" class="relative w-full h-full">
-                            <!-- Image, Overlay and Lines injected here -->
-                        </div>
-                    </div>
-                    
-                </div>
             </div>
 
-            <!-- Right Column: Results Gallery -->
-            <div class="lg:col-span-7">
-                <div class="bg-white rounded-xl shadow-sm p-6 min-h-[500px] flex flex-col">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="font-bold text-slate-800">Extracted Frames (<span id="countDisplay">0</span>)</h2>
-                        <div id="processingIndicator" class="hidden flex items-center gap-2 text-xs text-blue-600 font-medium">
-                            <div class="loader"></div>
-                            Processing...
-                        </div>
+            <!-- Right Panel: Results -->
+            <div class="lg:col-span-5 flex flex-col min-h-0 bg-white rounded-xl shadow-sm border border-slate-200">
+                <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50 rounded-t-xl shrink-0">
+                    <div class="flex items-center gap-3">
+                        <h2 class="font-bold text-slate-700">Selected Frames</h2>
+                        <span id="countBadge" class="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-bold">0</span>
                     </div>
-                    
-                    <div id="gallery" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3 content-start">
-                        <!-- Placeholder -->
-                        <div class="col-span-full py-20 text-center text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">
-                            Frames will appear here automatically
+                    <button id="downloadAllBtn" class="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded font-medium transition-colors">
+                        Download All
+                    </button>
+                </div>
+                
+                <div id="galleryContainer" class="flex-1 overflow-y-auto p-4 bg-white">
+                    <div id="gallery" class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div class="col-span-full py-12 text-center text-slate-400 text-sm">
+                            Draw a box on the image to see results here
                         </div>
                     </div>
                 </div>
             </div>
 
         </div>
-
-        <!-- Hidden Canvas -->
         <canvas id="canvas" class="hidden"></canvas>
     </div>
 
     <script>
-        // DOM Elements
-        const dropZone = document.getElementById('dropZone');
+        // --- Elements ---
         const fileInput = document.getElementById('fileInput');
-        const uploadArea = document.getElementById('uploadArea');
-        const editorArea = document.getElementById('editorArea');
-        const topControls = document.getElementById('topControls');
-        const imageContainer = document.getElementById('imageContainer');
-        const gallery = document.getElementById('gallery');
+        const headerControls = document.getElementById('headerControls');
+        const controlsPanel = document.getElementById('controlsPanel');
+        const placeholderText = document.getElementById('placeholderText');
         const previewWrapper = document.getElementById('previewWrapper');
-        
-        // Buttons & Inputs
-        const rowsInput = document.getElementById('rowsInput');
-        const colsInput = document.getElementById('colsInput');
-        const applyGridBtn = document.getElementById('applyGridBtn');
-        const resetGridBtn = document.getElementById('resetGridBtn');
+        const imageContainer = document.getElementById('imageContainer');
+        const sourceImg = document.getElementById('sourceImg');
+        const selectionLayer = document.getElementById('selectionLayer');
+        const gallery = document.getElementById('gallery');
+        const countBadge = document.getElementById('countBadge');
+        const clearAllBtn = document.getElementById('clearAllBtn');
         const downloadAllBtn = document.getElementById('downloadAllBtn');
-        const processingIndicator = document.getElementById('processingIndicator');
+        const resetImageBtn = document.getElementById('resetImageBtn');
 
-        // State
-        let sourceImage = null;
-        let rowPercents = []; // Array of percentages [0, 16.6, 33.3, ... 100]
-        let colPercents = []; // Array of percentages
-        let draggingLine = null; // { type: 'row'|'col', index: number }
+        // --- State ---
+        let imgObj = null;
+        // Selections stored as percentages: [{x, y, w, h}, ...]
+        let selections = []; 
         
-        // Debounce for processing to avoid freezing while dragging
-        let processTimeout;
+        let isDrawing = false;
+        let drawStart = { x: 0, y: 0 };
+        let activeSelectionDiv = null;
 
-        // --- Drag & Drop ---
-        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('active'); });
-        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
-        dropZone.addEventListener('drop', (e) => {
+        let isMoving = false;
+        let moveTargetIndex = -1;
+        let moveOffset = { x: 0, y: 0 };
+
+        // --- Init ---
+        
+        placeholderText.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', e => {
+            if(e.target.files[0]) loadFile(e.target.files[0]);
+        });
+        
+        placeholderText.addEventListener('dragover', (e) => {
+             e.preventDefault();
+             placeholderText.classList.add('bg-blue-50', 'border-blue-400');
+        });
+        placeholderText.addEventListener('dragleave', () => {
+             placeholderText.classList.remove('bg-blue-50', 'border-blue-400');
+        });
+        placeholderText.addEventListener('drop', (e) => {
             e.preventDefault();
-            dropZone.classList.remove('active');
-            if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
-        });
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length) handleFile(e.target.files[0]);
+            placeholderText.classList.remove('bg-blue-50', 'border-blue-400');
+            if(e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
         });
 
-        function handleFile(file) {
-            if (!file.type.startsWith('image/')) return alert('Please upload an image.');
+        function loadFile(file) {
             const reader = new FileReader();
-            reader.onload = (e) => {
-                sourceImage = new Image();
-                sourceImage.onload = () => initEditor();
-                sourceImage.src = e.target.result;
+            reader.onload = e => {
+                imgObj = new Image();
+                imgObj.onload = () => {
+                    initInterface();
+                };
+                imgObj.src = e.target.result;
+                sourceImg.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
 
-        function initEditor() {
-            uploadArea.classList.add('hidden');
-            editorArea.classList.remove('hidden');
-            topControls.classList.remove('hidden');
+        function initInterface() {
+            placeholderText.classList.add('hidden');
+            previewWrapper.classList.remove('hidden');
+            controlsPanel.classList.remove('hidden');
+            headerControls.classList.remove('hidden');
             
-            // Initialize Grid State based on inputs
-            generateUniformGrid();
+            selections = [];
             
-            // Initial Render
-            renderEditor();
-            processFrames();
+            fitImageToCanvas();
+            renderSelections();
+            extractFrames();
         }
 
-        function generateUniformGrid() {
-            const rows = parseInt(rowsInput.value) || 6;
-            const cols = parseInt(colsInput.value) || 6;
-            
-            rowPercents = [];
-            for (let i = 0; i <= rows; i++) rowPercents.push((i / rows) * 100);
-            
-            colPercents = [];
-            for (let i = 0; i <= cols; i++) colPercents.push((i / cols) * 100);
+        function resetAll() {
+            imgObj = null;
+            selections = [];
+            sourceImg.src = '';
+            fileInput.value = '';
+
+            previewWrapper.classList.add('hidden');
+            controlsPanel.classList.add('hidden');
+            headerControls.classList.add('hidden');
+            placeholderText.classList.remove('hidden');
+            gallery.innerHTML = '<div class="col-span-full py-12 text-center text-slate-400 text-sm">Draw a box on the image to see results here</div>';
+            countBadge.innerText = '0';
         }
 
-        // --- Editor Rendering ---
-        function renderEditor() {
-            imageContainer.innerHTML = '';
+        function fitImageToCanvas() {
+            const container = previewWrapper.parentElement;
+            const cW = container.clientWidth - 40;
+            const cH = container.clientHeight - 40;
             
-            // Background Image
-            const img = document.createElement('img');
-            img.src = sourceImage.src;
-            img.className = 'absolute top-0 left-0 w-full h-full object-contain';
-            img.style.pointerEvents = 'none'; // Click through to container
-            imageContainer.appendChild(img);
+            const iRatio = imgObj.width / imgObj.height;
+            const cRatio = cW / cH;
 
-            // We need to know the actual rendered dimensions of the image to place lines correctly
-            // The image is object-contain within 'imageContainer'
-            // We'll create a "Grid Layout Box" that sits exactly on top of the visible image pixels
-            
-            const containerRatio = previewWrapper.clientWidth / previewWrapper.clientHeight;
-            const imgRatio = sourceImage.width / sourceImage.height;
-            
-            let displayW, displayH, displayL, displayT;
-
-            if (imgRatio > containerRatio) {
-                displayW = previewWrapper.clientWidth;
-                displayH = displayW / imgRatio;
-                displayL = 0;
-                displayT = (previewWrapper.clientHeight - displayH) / 2;
+            let finalW, finalH;
+            if (iRatio > cRatio) {
+                finalW = cW;
+                finalH = cW / iRatio;
             } else {
-                displayH = previewWrapper.clientHeight;
-                displayW = displayH * imgRatio;
-                displayT = 0;
-                displayL = (previewWrapper.clientWidth - displayW) / 2;
+                finalH = cH;
+                finalW = cH * iRatio;
             }
 
-            // Grid Container (This is where lines live)
-            const gridBox = document.createElement('div');
-            gridBox.style.position = 'absolute';
-            gridBox.style.left = `${displayL}px`;
-            gridBox.style.top = `${displayT}px`;
-            gridBox.style.width = `${displayW}px`;
-            gridBox.style.height = `${displayH}px`;
-            gridBox.style.boxShadow = '0 0 0 1px rgba(0,0,0,0.1)';
-            imageContainer.appendChild(gridBox);
-
-            // Render Rows Lines
-            rowPercents.forEach((pct, idx) => {
-                const line = document.createElement('div');
-                line.className = 'grid-line horizontal';
-                line.style.top = `${pct}%`;
-                line.dataset.type = 'row';
-                line.dataset.index = idx;
-                
-                // Mouse Events for Dragging
-                line.addEventListener('mousedown', startDrag);
-                gridBox.appendChild(line);
-            });
-
-            // Render Col Lines
-            colPercents.forEach((pct, idx) => {
-                const line = document.createElement('div');
-                line.className = 'grid-line vertical';
-                line.style.left = `${pct}%`;
-                line.dataset.type = 'col';
-                line.dataset.index = idx;
-
-                // Mouse Events for Dragging
-                line.addEventListener('mousedown', startDrag);
-                gridBox.appendChild(line);
-            });
-            
-            // Store gridBox dimensions for drag calc
-            window.gridBoxRect = gridBox.getBoundingClientRect();
+            previewWrapper.style.width = finalW + 'px';
+            previewWrapper.style.height = finalH + 'px';
         }
 
-        // --- Dragging Logic ---
-        function startDrag(e) {
+        // --- Interaction Logic ---
+
+        selectionLayer.addEventListener('mousedown', handleMouseDown);
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        function handleMouseDown(e) {
+            if(e.target.classList.contains('box-delete')) return;
+
             e.preventDefault();
-            const type = e.target.dataset.type;
-            const index = parseInt(e.target.dataset.index);
-            
-            // Prevent dragging first and last lines (0% and 100%) if we want to keep outer bounds fixed?
-            // Actually, allowing user to crop is good. Let's allow all.
-            
-            draggingLine = { type, index };
-            document.addEventListener('mousemove', onDrag);
-            document.addEventListener('mouseup', stopDrag);
-            
-            // Recalculate rect in case of resize
-            // We find the parent gridBox
-            window.gridBoxRect = e.target.parentElement.getBoundingClientRect();
-        }
+            const rect = selectionLayer.getBoundingClientRect();
+            const clientX = e.clientX - rect.left;
+            const clientY = e.clientY - rect.top;
 
-        function onDrag(e) {
-            if (!draggingLine) return;
+            // Check if clicking inside existing box to move
+            // We iterate backwards to catch top-most box first
+            const boxIndex = selections.slice().reverse().findIndex(s => {
+                const sx = (s.x / 100) * rect.width;
+                const sy = (s.y / 100) * rect.height;
+                const sw = (s.w / 100) * rect.width;
+                const sh = (s.h / 100) * rect.height;
+                return clientX >= sx && clientX <= sx + sw && clientY >= sy && clientY <= sy + sh;
+            });
 
-            let pct;
-            if (draggingLine.type === 'row') {
-                const relY = e.clientY - window.gridBoxRect.top;
-                pct = (relY / window.gridBoxRect.height) * 100;
-                // Clamp
-                pct = Math.max(0, Math.min(100, pct));
-                rowPercents[draggingLine.index] = pct;
+            if (boxIndex !== -1) {
+                // Moving
+                isMoving = true;
+                moveTargetIndex = selections.length - 1 - boxIndex; // Convert reverse index to real index
+                const sel = selections[moveTargetIndex];
                 
-                // Sort to keep logical order? No, dragged line should just move. 
-                // But if they cross lines, extraction might get weird (negative height).
-                // Let's rely on user visually. 
-            } else {
-                const relX = e.clientX - window.gridBoxRect.left;
-                pct = (relX / window.gridBoxRect.width) * 100;
-                pct = Math.max(0, Math.min(100, pct));
-                colPercents[draggingLine.index] = pct;
+                // Calculate offset percent
+                moveOffset.x = (clientX / rect.width * 100) - sel.x;
+                moveOffset.y = (clientY / rect.height * 100) - sel.y;
+                return;
             }
 
-            // Visual Update (Fast)
-            updateLinePositions();
+            // Drawing new box
+            isDrawing = true;
+            drawStart = { x: clientX, y: clientY };
+            
+            // Create temp visual div
+            activeSelectionDiv = document.createElement('div');
+            activeSelectionDiv.className = 'selection-box drawing';
+            activeSelectionDiv.style.left = clientX + 'px';
+            activeSelectionDiv.style.top = clientY + 'px';
+            activeSelectionDiv.style.width = '0px';
+            activeSelectionDiv.style.height = '0px';
+            selectionLayer.appendChild(activeSelectionDiv);
         }
 
-        function stopDrag() {
-            if (draggingLine) {
-                draggingLine = null;
-                document.removeEventListener('mousemove', onDrag);
-                document.removeEventListener('mouseup', stopDrag);
-                // Trigger heavy process
-                processFrames();
-                // Ensure order is correct for extraction logic
-                rowPercents.sort((a,b) => a-b);
-                colPercents.sort((a,b) => a-b);
-                renderEditor(); // Re-render to ensure DOM matches sorted state
+        function handleMouseMove(e) {
+            const rect = selectionLayer.getBoundingClientRect();
+            const clientX = e.clientX - rect.left;
+            const clientY = e.clientY - rect.top;
+
+            if (isMoving && moveTargetIndex !== -1) {
+                let newX = (clientX / rect.width * 100) - moveOffset.x;
+                let newY = (clientY / rect.height * 100) - moveOffset.y;
+                
+                const sel = selections[moveTargetIndex];
+                
+                // Clamp to bounds
+                newX = Math.max(0, Math.min(100 - sel.w, newX));
+                newY = Math.max(0, Math.min(100 - sel.h, newY));
+                
+                selections[moveTargetIndex].x = newX;
+                selections[moveTargetIndex].y = newY;
+                
+                renderSelections();
+            }
+            else if (isDrawing && activeSelectionDiv) {
+                const left = Math.min(drawStart.x, clientX);
+                const top = Math.min(drawStart.y, clientY);
+                const width = Math.abs(clientX - drawStart.x);
+                const height = Math.abs(clientY - drawStart.y);
+
+                activeSelectionDiv.style.left = left + 'px';
+                activeSelectionDiv.style.top = top + 'px';
+                activeSelectionDiv.style.width = width + 'px';
+                activeSelectionDiv.style.height = height + 'px';
             }
         }
 
-        function updateLinePositions() {
-            // Locate the specific DOM element and update style
-            const typeClass = draggingLine.type === 'row' ? 'horizontal' : 'vertical';
-            const prop = draggingLine.type === 'row' ? 'top' : 'left';
-            const arr = draggingLine.type === 'row' ? rowPercents : colPercents;
-            
-            // We need to find the specific line. 
-            // Since we didn't store refs, querySelector is fine for this scale
-            const lines = document.querySelectorAll(`.grid-line.${typeClass}`);
-            // Note: DOM order matches array order initially, but if we don't re-render, 
-            // the index in dataset matches the index in our array.
-            
-            // We find the one with matching dataset index
-            const line = Array.from(lines).find(l => parseInt(l.dataset.index) === draggingLine.index);
-            if (line) {
-                line.style[prop] = `${arr[draggingLine.index]}%`;
+        function handleMouseUp(e) {
+            const rect = selectionLayer.getBoundingClientRect();
+
+            if (isMoving) {
+                isMoving = false;
+                moveTargetIndex = -1;
+                extractFrames(); // Update gallery after move
+            }
+            else if (isDrawing && activeSelectionDiv) {
+                isDrawing = false;
+                
+                // Parse final geometry
+                const style = getComputedStyle(activeSelectionDiv);
+                const pxLeft = parseFloat(style.left);
+                const pxTop = parseFloat(style.top);
+                const pxWidth = parseFloat(style.width);
+                const pxHeight = parseFloat(style.height);
+                
+                // Remove temp div
+                activeSelectionDiv.remove();
+                activeSelectionDiv = null;
+
+                // Threshold to ignore clicks
+                if (pxWidth < 10 || pxHeight < 10) return;
+
+                // Convert to percentages
+                const pctX = (pxLeft / rect.width) * 100;
+                const pctY = (pxTop / rect.height) * 100;
+                const pctW = (pxWidth / rect.width) * 100;
+                const pctH = (pxHeight / rect.height) * 100;
+
+                selections.push({ x: pctX, y: pctY, w: pctW, h: pctH });
+                renderSelections();
+                extractFrames();
             }
         }
 
-        // --- Processing ---
-        function processFrames() {
-            processingIndicator.classList.remove('hidden');
+        // --- Rendering ---
+
+        function renderSelections() {
+            selectionLayer.innerHTML = '';
             
-            // Small delay to allow UI to update loading state
-            setTimeout(() => {
-                const canvas = document.getElementById('canvas');
-                const ctx = canvas.getContext('2d');
+            selections.forEach((sel, index) => {
+                const el = document.createElement('div');
+                el.className = 'selection-box';
+                el.style.left = sel.x + '%';
+                el.style.top = sel.y + '%';
+                el.style.width = sel.w + '%';
+                el.style.height = sel.h + '%';
                 
-                // We extract based on the intervals defined by rowPercents and colPercents
-                // Since they are sorted (mostly), we iterate [i] to [i+1]
+                const del = document.createElement('div');
+                del.className = 'box-delete';
+                del.innerText = '×';
+                del.title = 'Remove selection';
+                del.onmousedown = (e) => {
+                    e.stopPropagation(); // Prevent drag start
+                    selections.splice(index, 1);
+                    renderSelections();
+                    extractFrames();
+                };
+                el.appendChild(del);
                 
-                gallery.innerHTML = '';
-                let count = 0;
-
-                // Ensure sorted
-                const sortedRows = [...rowPercents].sort((a,b) => a-b);
-                const sortedCols = [...colPercents].sort((a,b) => a-b);
-
-                // We want to make the cards uniform size in the gallery for neatness, 
-                // even if extracted frames are variable size. CSS handles that.
-                
-                // Loop through intervals
-                for (let r = 0; r < sortedRows.length - 1; r++) {
-                    for (let c = 0; c < sortedCols.length - 1; c++) {
-                        const y1 = (sortedRows[r] / 100) * sourceImage.height;
-                        const y2 = (sortedRows[r+1] / 100) * sourceImage.height;
-                        const x1 = (sortedCols[c] / 100) * sourceImage.width;
-                        const x2 = (sortedCols[c+1] / 100) * sourceImage.width;
-                        
-                        const w = x2 - x1;
-                        const h = y2 - y1;
-
-                        if (w <= 1 || h <= 1) continue; // Skip collapsed lines
-
-                        canvas.width = w;
-                        canvas.height = h;
-                        
-                        ctx.drawImage(sourceImage, x1, y1, w, h, 0, 0, w, h);
-                        
-                        const src = canvas.toDataURL('image/png');
-                        addFrameToGallery(src, ++count);
-                    }
-                }
-                
-                document.getElementById('countDisplay').innerText = count;
-                processingIndicator.classList.add('hidden');
-            }, 10);
+                selectionLayer.appendChild(el);
+            });
         }
 
-        function addFrameToGallery(src, index) {
+        // --- Extraction ---
+
+        function extractFrames() {
+            if(!imgObj) return;
+
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            gallery.innerHTML = '';
+            
+            if (selections.length === 0) {
+                 gallery.innerHTML = '<div class="col-span-full py-12 text-center text-slate-400 text-sm">Draw a box on the image to see results here</div>';
+                 countBadge.innerText = '0';
+                 return;
+            }
+
+            let count = 0;
+
+            selections.forEach((sel, i) => {
+                // High Quality Extraction: Use original image dimensions
+                const x = (sel.x / 100) * imgObj.width;
+                const y = (sel.y / 100) * imgObj.height;
+                const w = (sel.w / 100) * imgObj.width;
+                const h = (sel.h / 100) * imgObj.height;
+
+                if(w < 1 || h < 1) return; 
+
+                canvas.width = w;
+                canvas.height = h;
+                
+                // Clear canvas just in case (though we resize it)
+                ctx.clearRect(0,0,w,h);
+                
+                // Draw full resolution pixels
+                ctx.drawImage(imgObj, x, y, w, h, 0, 0, w, h);
+                
+                addGalleryItem(canvas.toDataURL('image/png'), ++count);
+            });
+            
+            countBadge.innerText = count;
+        }
+
+        function addGalleryItem(src, idx) {
             const div = document.createElement('div');
-            div.className = 'bg-white p-2 rounded shadow-sm border border-slate-100 hover:shadow-md transition-all group';
+            div.className = 'group relative aspect-square bg-slate-50 border border-slate-200 rounded-lg overflow-hidden flex items-center justify-center hover:shadow-md transition-all';
             div.innerHTML = `
-                <div class="aspect-square bg-slate-50 mb-2 rounded overflow-hidden flex items-center justify-center relative">
-                    <img src="${src}" class="max-w-full max-h-full object-contain">
-                </div>
-                <div class="flex justify-between items-center px-1">
-                    <span class="text-xs font-bold text-slate-400">#${index}</span>
-                    <a href="${src}" download="frame_${index}.png" class="text-blue-600 hover:text-blue-800 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">Save</a>
-                </div>
+                <img src="${src}" class="max-w-full max-h-full object-contain p-1">
+                <div class="absolute top-1 left-1 bg-black/50 text-white text-[10px] px-1.5 rounded font-medium">#${idx}</div>
+                <a href="${src}" download="frame_${idx}.png" class="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <span class="bg-white text-slate-900 px-3 py-1 rounded shadow-sm text-xs font-bold transform translate-y-2 group-hover:translate-y-0 transition-transform">Download</span>
+                </a>
             `;
             gallery.appendChild(div);
         }
 
-        // --- Controls Handlers ---
-        applyGridBtn.addEventListener('click', () => {
-            generateUniformGrid();
-            renderEditor();
-            processFrames();
-        });
-
-        resetGridBtn.addEventListener('click', () => {
-            rowsInput.value = 6;
-            colsInput.value = 6;
-            generateUniformGrid();
-            renderEditor();
-            processFrames();
-        });
-
-        downloadAllBtn.addEventListener('click', () => {
-            const imgs = gallery.querySelectorAll('img');
-            let count = 0;
-            const max = imgs.length;
-            
-            if(max === 0) return alert('No frames to download');
-
-            // Download loop with delay
-            const downloadNext = () => {
-                if(count >= max) return;
-                
-                const img = imgs[count];
-                const a = document.createElement('a');
-                a.href = img.src;
-                a.download = `frame_${count + 1}.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                
-                count++;
-                setTimeout(downloadNext, 200);
-            };
-            
-            downloadNext();
+        // --- Controls ---
+        clearAllBtn.addEventListener('click', () => {
+            selections = [];
+            renderSelections();
+            extractFrames();
         });
         
-        // Window Resize Handler
+        resetImageBtn.addEventListener('click', resetAll);
+
+        downloadAllBtn.addEventListener('click', () => {
+            const links = gallery.querySelectorAll('a');
+            if(links.length === 0) return alert('No selections to download');
+            let i = 0;
+            const next = () => {
+                if(i >= links.length) return;
+                links[i].click();
+                i++;
+                setTimeout(next, 150);
+            };
+            next();
+        });
+
         window.addEventListener('resize', () => {
-             if(sourceImage) renderEditor(); 
+            if(imgObj) fitImageToCanvas();
         });
 
     </script>
